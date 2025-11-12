@@ -1,0 +1,43 @@
+import Link from "next/link";
+import { AuthButton } from "@/components/auth-button";
+import { ThemeSwitcher } from "@/components/theme-switcher";
+import { hasEnvVars } from "@/lib/utils";
+
+interface AppLayoutProps {
+  children: React.ReactNode;
+  showFooter?: boolean;
+}
+
+export function AppLayout({ children, showFooter = true }: AppLayoutProps) {
+  const currentYear = new Date().getFullYear();
+
+  return (
+    <main className="min-h-screen flex flex-col items-center">
+      <div className="flex-1 w-full flex flex-col items-center">
+        <nav className="w-full flex justify-center border-b border-b-foreground/10 h-16">
+          <div className="w-full max-w-5xl flex justify-between items-center p-3 px-5 text-sm font-semibold">
+            <Link href="/" className="text-lg tracking-wide">
+              aiqoe
+            </Link>
+            {hasEnvVars ? (
+              <AuthButton />
+            ) : (
+              <p className="text-xs text-muted-foreground font-normal">
+                Configure your environment variables to enable auth.
+              </p>
+            )}
+          </div>
+        </nav>
+
+        <div className="flex-1 w-full">{children}</div>
+
+        {showFooter && (
+          <footer className="w-full flex items-center justify-between border-t mx-auto text-xs gap-8 py-10 px-5 max-w-5xl">
+            <p>© {currentYear} aiqoe. All rights reserved.</p>
+            <ThemeSwitcher />
+          </footer>
+        )}
+      </div>
+    </main>
+  );
+}
