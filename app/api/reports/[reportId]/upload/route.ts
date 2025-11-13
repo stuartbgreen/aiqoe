@@ -57,16 +57,37 @@ export async function POST(
       );
     }
 
-    // Get public URL (even though it's private, we'll use signed URLs later)
-    const { data: urlData } = supabase.storage
-      .from("report-documents")
-      .getPublicUrl(filePath);
+    const metadata = {
+      size: file.size,
+      mime_type: file.type || null,
+      last_modified: file.lastModified ?? null,
+    };
+
+    const { data: document, error: documentError } = await supabase
+      .from("report_documents")
+      .insert({
+        report_id: reportId,
+        storage_path: uploadData.path,
+        original_filename: file.name,
+        document_type: file.type || "application/octet-stream",
+        metadata,
+      })
+      .select()
+      .single();
+
+    if (documentError || !document) {
+      console.error("Error recording document:", documentError);
+      await supabase.storage.from("report-documents").remove([filePath]);
+      return NextResponse.json(
+        { error: "Failed to record uploaded document" },
+        { status: 500 }
+      );
+    }
 
     return NextResponse.json(
       {
         success: true,
-        path: uploadData.path,
-        url: urlData.publicUrl,
+        document,
       },
       { status: 201 }
     );
@@ -109,23 +130,110 @@ export async function GET(
       return NextResponse.json({ error: "Report not found" }, { status: 404 });
     }
 
-    // List files in the report's input folder
-    const folderPath = `${user.id}/${reportId}/input`;
-    const { data: files, error: listError } = await supabase.storage
-      .from("report-documents")
-      .list(folderPath);
+    const { data: documents, error: documentsError } = await supabase
+      .from("report_documents")
+      .select("id, storage_path, original_filename, document_type, metadata, created_at")
+      .eq("report_id", reportId)
+      .order("created_at", { ascending: true });
 
-    if (listError) {
-      console.error("Error listing files:", listError);
+    if (documentsError) {
+      console.error("Error fetching report documents:", documentsError);
       return NextResponse.json(
         { error: "Failed to list files" },
         { status: 500 }
       );
     }
 
-    return NextResponse.json({ files: files || [] }, { status: 200 });
+    return NextResponse.json({ files: documents || [] }, { status: 200 });
   } catch (error) {
     console.error("Error processing request:", error);
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 }
+    );
+  }
+}
+
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ reportId: string }> }
+) {
+  const supabase = await createClient();
+  const { reportId } = await params;
+
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser();
+
+  if (authError || !user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  try {
+    const body = await request.json();
+    const { documentId } = body;
+
+    if (!documentId || typeof documentId !== "string") {
+      return NextResponse.json(
+        { error: "Document ID is required" },
+        { status: 400 }
+      );
+    }
+
+    const { data: report, error: reportError } = await supabase
+      .from("reports")
+      .select("id")
+      .eq("id", reportId)
+      .eq("user_id", user.id)
+      .single();
+
+    if (reportError || !report) {
+      return NextResponse.json({ error: "Report not found" }, { status: 404 });
+    }
+
+    const { data: document, error: documentError } = await supabase
+      .from("report_documents")
+      .select("id, storage_path")
+      .eq("id", documentId)
+      .eq("report_id", reportId)
+      .single();
+
+    if (documentError || !document) {
+      return NextResponse.json({ error: "Document not found" }, { status: 404 });
+    }
+
+    if (document.storage_path) {
+      const { error: storageError } = await supabase.storage
+        .from("report-documents")
+        .remove([document.storage_path]);
+
+      if (storageError) {
+        console.error("Error deleting file from storage:", storageError);
+        return NextResponse.json(
+          { error: "Failed to delete file from storage" },
+          { status: 500 }
+        );
+      }
+    }
+
+    const { error: deleteError } = await supabase
+      .from("report_documents")
+      .delete()
+      .eq("id", documentId)
+      .eq("report_id", reportId);
+
+    if (deleteError) {
+      console.error("Error deleting document record:", deleteError);
+      return NextResponse.json(
+        { error: "Failed to delete document" },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json({ success: true }, { status: 200 });
+  } catch (error) {
+    console.error("Error deleting document:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

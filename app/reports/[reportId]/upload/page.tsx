@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import { ReportWizardLayout } from "@/components/report-wizard-layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Upload, FileText, CheckCircle2, Loader2 } from "lucide-react";
+import { ReportFilesList } from "@/components/report-files-list";
+import { Upload, CheckCircle2, Loader2 } from "lucide-react";
 
 const STEPS = [
   { number: 1, title: "Report Name", description: "Name your report" },
@@ -22,6 +23,7 @@ const RECOMMENDED_DOCS = [
 ];
 
 interface UploadedFile {
+  id: string;
   name: string;
   size: number;
   uploadedAt: string;
@@ -55,11 +57,19 @@ export default function UploadDocumentsPage({
         if (filesResponse.ok) {
           const data = await filesResponse.json();
           setUploadedFiles(
-            data.files.map((f: { name: string; metadata?: { size?: number }; created_at: string }) => ({
-              name: f.name,
-              size: f.metadata?.size || 0,
-              uploadedAt: f.created_at,
-            }))
+            data.files.map(
+              (f: {
+                id: string;
+                original_filename: string;
+                metadata?: { size?: number | null };
+                created_at: string;
+              }) => ({
+                id: f.id,
+                name: f.original_filename,
+                size: f.metadata?.size ?? 0,
+                uploadedAt: f.created_at,
+              })
+            )
           );
         }
       } catch (err) {
@@ -88,18 +98,23 @@ export default function UploadDocumentsPage({
           method: "POST",
           body: formData,
         });
+        const data = await response.json();
 
         if (!response.ok) {
-          const data = await response.json();
           throw new Error(data.error || "Failed to upload file");
+        }
+
+        if (!data.document) {
+          throw new Error("Missing document details in response");
         }
 
         setUploadedFiles((prev) => [
           ...prev,
           {
-            name: file.name,
-            size: file.size,
-            uploadedAt: new Date().toISOString(),
+            id: data.document.id,
+            name: data.document.original_filename,
+            size: data.document.metadata?.size ?? file.size,
+            uploadedAt: data.document.created_at,
           },
         ]);
       }
@@ -126,6 +141,25 @@ export default function UploadDocumentsPage({
     handleFileUpload(e.dataTransfer.files);
   };
 
+  const handleDeleteFile = async (file: UploadedFile) => {
+    setError("");
+
+    const response = await fetch(`/api/reports/${reportId}/upload`, {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ documentId: file.id }),
+    });
+    const data = await response.json();
+
+    if (!response.ok) {
+      const message = data.error || "Failed to delete file";
+      setError(message);
+      throw new Error(message);
+    }
+
+    setUploadedFiles((prev) => prev.filter((existing) => existing.id !== file.id));
+  };
+
   const handleContinue = async () => {
     // Update report step and navigate to review
     try {
@@ -136,16 +170,9 @@ export default function UploadDocumentsPage({
       });
       router.push(`/reports/${reportId}/review`);
     } catch (err) {
+      console.error("Failed to update report step:", err);
       setError("Failed to continue");
     }
-  };
-
-  const formatFileSize = (bytes: number) => {
-    if (bytes === 0) return "0 Bytes";
-    const k = 1024;
-    const sizes = ["Bytes", "KB", "MB", "GB"];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return Math.round(bytes / Math.pow(k, i) * 100) / 100 + " " + sizes[i];
   };
 
   if (isLoading) {
@@ -229,24 +256,11 @@ export default function UploadDocumentsPage({
                       <CheckCircle2 className="h-4 w-4 text-green-600" />
                       Uploaded Files ({uploadedFiles.length})
                     </h3>
-                    <div className="space-y-2">
-                      {uploadedFiles.map((file, idx) => (
-                        <div
-                          key={idx}
-                          className="flex items-center justify-between p-3 border rounded-lg"
-                        >
-                          <div className="flex items-center gap-3">
-                            <FileText className="h-5 w-5 text-muted-foreground" />
-                            <div>
-                              <p className="text-sm font-medium">{file.name}</p>
-                              <p className="text-xs text-muted-foreground">
-                                {formatFileSize(file.size)}
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
+                    <ReportFilesList
+                      files={uploadedFiles}
+                      onDeleteFile={handleDeleteFile}
+                      disabled={isUploading}
+                    />
                   </div>
                 )}
 

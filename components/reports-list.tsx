@@ -149,9 +149,9 @@ export function ReportsList({ reports: initialReports }: ReportsListProps) {
           <DialogHeader>
             <DialogTitle>Delete Report</DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete "{reportToDelete?.name}"? This action
-              cannot be undone and will permanently delete the report and all
-              associated files.
+              Are you sure you want to delete &ldquo;{reportToDelete?.name}&rdquo;? This
+              action cannot be undone and will permanently delete the report and
+              all associated files.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import { ReportWizardLayout } from "@/components/report-wizard-layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Loader2, FileText } from "lucide-react";
+import { ReportFilesList } from "@/components/report-files-list";
+import { Loader2 } from "lucide-react";
 
 const STEPS = [
   { number: 1, title: "Report Name", description: "Name your report" },
@@ -21,8 +22,10 @@ interface Report {
 }
 
 interface UploadedFile {
+  id: string;
   name: string;
   size: number;
+  uploadedAt?: string;
 }
 
 export default function ReviewClassificationPage({
@@ -35,6 +38,7 @@ export default function ReviewClassificationPage({
   const [files, setFiles] = useState<UploadedFile[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
+  const [filesError, setFilesError] = useState("");
   const router = useRouter();
 
   useEffect(() => {
@@ -53,10 +57,19 @@ export default function ReviewClassificationPage({
         if (filesResponse.ok) {
           const filesData = await filesResponse.json();
           setFiles(
-            filesData.files.map((f: { name: string; metadata?: { size?: number } }) => ({
-              name: f.name,
-              size: f.metadata?.size || 0,
-            }))
+            filesData.files.map(
+              (f: {
+                id: string;
+                original_filename: string;
+                metadata?: { size?: number | null };
+                created_at?: string;
+              }) => ({
+                id: f.id,
+                name: f.original_filename,
+                size: f.metadata?.size ?? 0,
+                uploadedAt: f.created_at,
+              })
+            )
           );
         }
       } catch (err) {
@@ -80,8 +93,28 @@ export default function ReviewClassificationPage({
       });
       router.push("/");
     } catch (err) {
+      console.error("Failed to complete report:", err);
       setError("Failed to complete");
     }
+  };
+
+  const handleFileDelete = async (file: UploadedFile) => {
+    setFilesError("");
+
+    const response = await fetch(`/api/reports/${reportId}/upload`, {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ documentId: file.id }),
+    });
+    const data = await response.json();
+
+    if (!response.ok) {
+      const message = data.error || "Failed to delete file";
+      setFilesError(message);
+      throw new Error(message);
+    }
+
+    setFiles((prev) => prev.filter((existing) => existing.id !== file.id));
   };
 
   if (isLoading) {
@@ -132,17 +165,14 @@ export default function ReviewClassificationPage({
                   <h3 className="text-sm font-medium text-muted-foreground mb-2">
                     Uploaded Documents ({files.length})
                   </h3>
-                  <div className="space-y-2">
-                    {files.map((file, idx) => (
-                      <div
-                        key={idx}
-                        className="flex items-center gap-3 p-3 border rounded-lg"
-                      >
-                        <FileText className="h-5 w-5 text-muted-foreground" />
-                        <span className="text-sm">{file.name}</span>
-                      </div>
-                    ))}
-                  </div>
+                  <ReportFilesList
+                    files={files}
+                    onDeleteFile={files.length ? handleFileDelete : undefined}
+                    emptyMessage="No documents uploaded yet."
+                  />
+                  {filesError && (
+                    <p className="mt-2 text-sm text-destructive">{filesError}</p>
+                  )}
                 </div>
 
                 <div className="p-4 bg-muted rounded-lg">

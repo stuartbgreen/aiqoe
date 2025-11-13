@@ -19,23 +19,24 @@ export async function DELETE(
   }
 
   try {
-    // First, delete all files from storage for this report
-    const folderPath = `${user.id}/${reportId}`;
+    // Fetch all document records so we can clean up storage
+    const { data: documents, error: documentsError } = await supabase
+      .from("report_documents")
+      .select("storage_path")
+      .eq("report_id", reportId);
 
-    // List all files in the report folder
-    const { data: files } = await supabase.storage
-      .from("report-documents")
-      .list(folderPath, {
-        limit: 1000,
-        offset: 0,
-      });
+    if (documentsError) {
+      console.error("Error fetching report documents:", documentsError);
+      return NextResponse.json(
+        { error: "Failed to delete report files" },
+        { status: 500 }
+      );
+    }
 
-    // Delete all files if any exist
-    if (files && files.length > 0) {
-      const filePaths = files.map((file) => `${folderPath}/${file.name}`);
-      await supabase.storage
-        .from("report-documents")
-        .remove(filePaths);
+    const storagePaths = documents?.map((doc) => doc.storage_path) ?? [];
+
+    if (storagePaths.length) {
+      await supabase.storage.from("report-documents").remove(storagePaths);
     }
 
     // Delete the report from the database (RLS will ensure user owns it)
