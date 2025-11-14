@@ -59,32 +59,25 @@ export async function POST(
         { status: 500 }
       );
     }
-
-    const metadata: Record<string, unknown> = {
-      size: file.size,
-      mime_type: file.type || null,
-      last_modified: file.lastModified ?? null,
-    };
-
-    let document: Record<string, unknown> | null = {};
+    const document = {
+        reportId,
+        storagePath: uploadData.path,
+        originalFilename: file.name,
+        documentType: file.type || "application/octet-stream",
+      };
 
     await start(handleFileUpload, [
-        {
-          reportId,
-          storagePath: uploadData.path,
-          originalFilename: file.name,
-          documentType: file.type || "application/octet-stream",
-          metadata,
-        },
+      document
     ]);
-
-    document.original_filename = file.name;
-    document.id = uploadData.id;
 
     return NextResponse.json(
       {
         success: true,
-        document,
+        document: {
+          ...document,
+          name: file.name,
+          size: file.size,
+        },
       },
       { status: 201 }
     );

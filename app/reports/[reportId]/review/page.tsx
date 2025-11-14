@@ -26,6 +26,7 @@ interface UploadedFile {
   name: string;
   size: number;
   uploadedAt?: string;
+  documentType?: string;
 }
 
 export default function ReviewClassificationPage({
@@ -61,6 +62,7 @@ export default function ReviewClassificationPage({
               (f: {
                 id: string;
                 original_filename: string;
+                document_type?: string;
                 metadata?: { size?: number | null };
                 created_at?: string;
               }) => ({
@@ -68,6 +70,7 @@ export default function ReviewClassificationPage({
                 name: f.original_filename,
                 size: f.metadata?.size ?? 0,
                 uploadedAt: f.created_at,
+                documentType: f.document_type ?? "other",
               })
             )
           );
