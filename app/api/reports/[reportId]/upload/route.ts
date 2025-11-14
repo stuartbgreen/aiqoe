@@ -1,3 +1,4 @@
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -171,6 +172,7 @@ export async function DELETE(
   }
 
   try {
+    const adminSupabase = createAdminClient();
     const body = await request.json();
     const { documentId } = body;
 
@@ -192,9 +194,9 @@ export async function DELETE(
       return NextResponse.json({ error: "Report not found" }, { status: 404 });
     }
 
-    const { data: document, error: documentError } = await supabase
+    const { data: document, error: documentError } = await adminSupabase
       .from("report_documents")
-      .select("id, storage_path")
+      .select("*")
       .eq("id", documentId)
       .eq("report_id", reportId)
       .single();
@@ -203,21 +205,7 @@ export async function DELETE(
       return NextResponse.json({ error: "Document not found" }, { status: 404 });
     }
 
-    if (document.storage_path) {
-      const { error: storageError } = await supabase.storage
-        .from("report-documents")
-        .remove([document.storage_path]);
-
-      if (storageError) {
-        console.error("Error deleting file from storage:", storageError);
-        return NextResponse.json(
-          { error: "Failed to delete file from storage" },
-          { status: 500 }
-        );
-      }
-    }
-
-    const { error: deleteError } = await supabase
+    const { error: deleteError } = await adminSupabase
       .from("report_documents")
       .delete()
       .eq("id", documentId)
@@ -229,6 +217,35 @@ export async function DELETE(
         { error: "Failed to delete document" },
         { status: 500 }
       );
+    }
+
+    if (document.storage_path) {
+      const { error: storageError } = await adminSupabase.storage
+        .from("report-documents")
+        .remove([document.storage_path]);
+
+      if (storageError) {
+        console.error("Error deleting file from storage:", storageError);
+
+        const { error: rollbackError } = await adminSupabase
+          .from("report_documents")
+          .insert({
+            ...document,
+            id: document.id,
+          });
+
+        if (rollbackError) {
+          console.error(
+            "Failed to restore document after storage delete failure:",
+            rollbackError
+          );
+        }
+
+        return NextResponse.json(
+          { error: "Failed to delete file from storage" },
+          { status: 500 }
+        );
+      }
     }
 
     return NextResponse.json({ success: true }, { status: 200 });
