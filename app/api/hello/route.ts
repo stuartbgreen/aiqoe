@@ -4,7 +4,7 @@ import { start } from 'workflow/api';
 
 export async function GET() {
 
-  await start(handleUserSignup, ["test"]);
+  await start(handleUserSignup, ["test@test.com"]);
   
   return NextResponse.json({ message: "User signup workflow started" });
 }

@@ -1,8 +1,10 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import { FatalError, sleep } from "workflow";
 
 export async function handleUserSignup(email: string) {
  "use workflow"; 
 
+ console.log("Starting user signup workflow");
  const user = await createUser(email);
  await sendWelcomeEmail(user);
 
@@ -11,7 +13,7 @@ export async function handleUserSignup(email: string) {
 
  console.log("Workflow is complete! Run 'npx workflow web' to inspect your run")
 
- return { userId: user.id, status: "onboarded" };
+ return { userId: 345345, status: "onboarded" };
 }
 
 async function createUser(email: string) {
@@ -20,7 +22,7 @@ async function createUser(email: string) {
   console.log(`Creating user with email: ${email}`);
 
   // Full Node.js access - database calls, APIs, etc.
-  return { id: crypto.randomUUID(), email };
+  return { id: "sdfsdf", email };
 }
 
 async function sendWelcomeEmail(user: { id: string; email: string; }) {

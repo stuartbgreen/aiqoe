@@ -1,6 +1,8 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+import { handleFileUpload } from "@/workflows/file-upload";
 import { NextRequest, NextResponse } from "next/server";
+import { start } from "workflow/api";
 
 export async function POST(
   request: NextRequest,
@@ -58,32 +60,26 @@ export async function POST(
       );
     }
 
-    const metadata = {
+    const metadata: Record<string, unknown> = {
       size: file.size,
       mime_type: file.type || null,
       last_modified: file.lastModified ?? null,
     };
 
-    const { data: document, error: documentError } = await supabase
-      .from("report_documents")
-      .insert({
-        report_id: reportId,
-        storage_path: uploadData.path,
-        original_filename: file.name,
-        document_type: file.type || "application/octet-stream",
-        metadata,
-      })
-      .select()
-      .single();
+    let document: Record<string, unknown> | null = {};
 
-    if (documentError || !document) {
-      console.error("Error recording document:", documentError);
-      await supabase.storage.from("report-documents").remove([filePath]);
-      return NextResponse.json(
-        { error: "Failed to record uploaded document" },
-        { status: 500 }
-      );
-    }
+    await start(handleFileUpload, [
+        {
+          reportId,
+          storagePath: uploadData.path,
+          originalFilename: file.name,
+          documentType: file.type || "application/octet-stream",
+          metadata,
+        },
+    ]);
+
+    document.original_filename = file.name;
+    document.id = uploadData.id;
 
     return NextResponse.json(
       {
