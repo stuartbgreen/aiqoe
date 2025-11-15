@@ -6,8 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { use, useEffect, useState } from "react";
-import { startClassificationAction } from "./actions";
+import { use, useCallback, useEffect, useRef, useState } from "react";
 
 const STEPS = [
   { number: 1, title: "Report Name", description: "Name your report" },
@@ -30,6 +29,12 @@ interface UploadedFile {
   documentType?: string;
 }
 
+interface StoredRunState {
+  runId: string;
+  chunkIndex: number;
+  output: string;
+}
+
 export default function ReviewClassificationPage({
   params,
 }: {
@@ -41,7 +46,79 @@ export default function ReviewClassificationPage({
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
   const [filesError, setFilesError] = useState("");
+  const [classificationOutput, setClassificationOutput] = useState("");
+  const [isClassifying, setIsClassifying] = useState(false);
   const router = useRouter();
+  const chunkIndexRef = useRef(0);
+  const storageKey = `report-${reportId}-classification-run`;
+
+  const updateStoredRunState = useCallback(
+    (state: StoredRunState | null) => {
+      if (typeof window === "undefined") return;
+      if (!state) {
+        window.localStorage.removeItem(storageKey);
+        return;
+      }
+
+      window.localStorage.setItem(storageKey, JSON.stringify(state));
+    },
+    [storageKey]
+  );
+
+  const streamFromRun = useCallback(
+    async (runId: string, startIndex = 0) => {
+      const query = startIndex > 0 ? `?startIndex=${startIndex}` : "";
+      const response = await fetch(`/api/resume-stream/${runId}${query}`);
+      if (!response.ok) {
+        throw new Error("Unable to resume classification stream");
+      }
+
+      const body = response.body;
+      if (!body) {
+        throw new Error("Classification stream not available");
+      }
+
+      const reader = body.getReader();
+      const decoder = new TextDecoder();
+
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        if (value) {
+          const decodedChunk = decoder.decode(value, { stream: true });
+          const nextIndex = chunkIndexRef.current + 1;
+          chunkIndexRef.current = nextIndex;
+
+          setClassificationOutput((prev) => {
+            const nextOutput = prev + decodedChunk;
+            updateStoredRunState({
+              runId,
+              chunkIndex: nextIndex,
+              output: nextOutput,
+            });
+            return nextOutput;
+          });
+        }
+      }
+
+      const flushed = decoder.decode();
+      if (flushed) {
+        setClassificationOutput((prev) => {
+          const nextOutput = prev + flushed;
+          updateStoredRunState({
+            runId,
+            chunkIndex: chunkIndexRef.current,
+            output: nextOutput,
+          });
+          return nextOutput;
+        });
+      }
+
+      // updateStoredRunState(null);
+      chunkIndexRef.current = 0;
+    },
+    [updateStoredRunState]
+  );
 
   useEffect(() => {
     const loadData = async () => {
@@ -86,12 +163,69 @@ export default function ReviewClassificationPage({
     loadData();
   }, [reportId]);
 
-  const handleComplete = async () => {
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const storedValue = window.localStorage.getItem(storageKey);
+    if (!storedValue) return;
+
     try {
-      await startClassificationAction();
+      const parsed = JSON.parse(storedValue) as StoredRunState;
+      if (!parsed?.runId) return;
+
+      chunkIndexRef.current = parsed.chunkIndex ?? 0;
+      setClassificationOutput(parsed.output ?? "");
+      setIsClassifying(true);
+
+      streamFromRun(parsed.runId, parsed.chunkIndex ?? 0)
+        .catch((err) => {
+          console.error("Failed to resume classification:", err);
+          setError("Failed to resume classification stream.");
+        })
+        .finally(() => {
+          setIsClassifying(false);
+        });
+    } catch {
+      window.localStorage.removeItem(storageKey);
+    }
+  }, [storageKey, streamFromRun]);
+
+  const handleComplete = async () => {
+    setError("");
+    setClassificationOutput("");
+    setIsClassifying(true);
+    chunkIndexRef.current = 0;
+    let runId: string | null = null;
+
+    try {
+      const response = await fetch(`/api/reports/${reportId}/review`);
+      if (!response.ok) {
+        throw new Error("Classification request failed");
+      }
+      const data = await response.json();
+      const extractedRunId =
+        typeof data?.runId === "string" ? data.runId : null;
+      runId = extractedRunId;
+
+      if (!extractedRunId) {
+        throw new Error("Missing workflow run id");
+      }
+
+      updateStoredRunState({
+        runId: extractedRunId,
+        chunkIndex: 0,
+        output: "",
+      });
+
+      await streamFromRun(extractedRunId, 0);
     } catch (err) {
       console.error("Failed to start classification:", err);
       setError("Failed to start classification");
+      setClassificationOutput("Failed to read classification output.");
+      if (!runId) {
+        updateStoredRunState(null);
+      }
+    } finally {
+      setIsClassifying(false);
     }
   };
 
@@ -179,6 +313,18 @@ export default function ReviewClassificationPage({
                   uploaded and saved.
                 </p>
               </div>
+
+              <div className="space-y-2">
+                <h3 className="text-sm font-medium text-muted-foreground">
+                  Classification Output
+                </h3>
+                <div className="min-h-[120px] whitespace-pre-wrap rounded border bg-background p-4 font-mono text-sm">
+                  {classificationOutput ||
+                    (isClassifying
+                      ? "Streaming classification output..."
+                      : "Start the workflow to view streaming output.")}
+                </div>
+              </div>
             </div>
 
             <div className="flex justify-between pt-4">
@@ -189,7 +335,9 @@ export default function ReviewClassificationPage({
               >
                 Back to Upload
               </Button>
-              <Button onClick={handleComplete}>Start classify workflow</Button>
+              <Button onClick={handleComplete} disabled={isClassifying}>
+                {isClassifying ? "Streaming..." : "Start classify workflow"}
+              </Button>
             </div>
           </CardContent>
         </Card>
