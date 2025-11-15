@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useEffect, use } from "react";
-import { useRouter } from "next/navigation";
+import { ReportFilesList } from "@/components/report-files-list";
 import { ReportWizardLayout } from "@/components/report-wizard-layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ReportFilesList } from "@/components/report-files-list";
 import { Loader2 } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { use, useEffect, useState } from "react";
+import { startClassificationAction } from "./actions";
 
 const STEPS = [
   { number: 1, title: "Report Name", description: "Name your report" },
@@ -86,18 +87,11 @@ export default function ReviewClassificationPage({
   }, [reportId]);
 
   const handleComplete = async () => {
-    // In the future, this will trigger classification processing
-    // For now, just redirect to home or a success page
     try {
-      await fetch(`/api/reports/${reportId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ current_step: 3 }),
-      });
-      router.push("/");
+      await startClassificationAction();
     } catch (err) {
-      console.error("Failed to complete report:", err);
-      setError("Failed to complete");
+      console.error("Failed to start classification:", err);
+      setError("Failed to start classification");
     }
   };
 
@@ -146,60 +140,60 @@ export default function ReviewClassificationPage({
 
   return (
     <div className="flex-1 flex items-start justify-center py-12">
-        <ReportWizardLayout currentStep={3} steps={STEPS}>
-          <Card>
-            <CardHeader>
-              <CardTitle>Review Classification</CardTitle>
-              <CardDescription>
-                Review your report details before processing
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              {/* Report Summary */}
-              <div className="space-y-4">
-                <div>
-                  <h3 className="text-sm font-medium text-muted-foreground">
-                    Report Name
-                  </h3>
-                  <p className="text-lg font-semibold">{report.name}</p>
-                </div>
-
-                <div>
-                  <h3 className="text-sm font-medium text-muted-foreground mb-2">
-                    Uploaded Documents ({files.length})
-                  </h3>
-                  <ReportFilesList
-                    files={files}
-                    onDeleteFile={files.length ? handleFileDelete : undefined}
-                    emptyMessage="No documents uploaded yet."
-                  />
-                  {filesError && (
-                    <p className="mt-2 text-sm text-destructive">{filesError}</p>
-                  )}
-                </div>
-
-                <div className="p-4 bg-muted rounded-lg">
-                  <p className="text-sm text-muted-foreground">
-                    Classification and analysis features will be available in the
-                    next update. For now, your documents have been securely
-                    uploaded and saved.
-                  </p>
-                </div>
+      <ReportWizardLayout currentStep={3} steps={STEPS}>
+        <Card>
+          <CardHeader>
+            <CardTitle>Review Classification</CardTitle>
+            <CardDescription>
+              Review your report details before processing
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {/* Report Summary */}
+            <div className="space-y-4">
+              <div>
+                <h3 className="text-sm font-medium text-muted-foreground">
+                  Report Name
+                </h3>
+                <p className="text-lg font-semibold">{report.name}</p>
               </div>
 
-              <div className="flex justify-between pt-4">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => router.push(`/reports/${reportId}/upload`)}
-                >
-                  Back to Upload
-                </Button>
-                <Button onClick={handleComplete}>Complete</Button>
+              <div>
+                <h3 className="text-sm font-medium text-muted-foreground mb-2">
+                  Uploaded Documents ({files.length})
+                </h3>
+                <ReportFilesList
+                  files={files}
+                  onDeleteFile={files.length ? handleFileDelete : undefined}
+                  emptyMessage="No documents uploaded yet."
+                />
+                {filesError && (
+                  <p className="mt-2 text-sm text-destructive">{filesError}</p>
+                )}
               </div>
-            </CardContent>
-          </Card>
-        </ReportWizardLayout>
+
+              <div className="p-4 bg-muted rounded-lg">
+                <p className="text-sm text-muted-foreground">
+                  Classification and analysis features will be available in the
+                  next update. For now, your documents have been securely
+                  uploaded and saved.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex justify-between pt-4">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => router.push(`/reports/${reportId}/upload`)}
+              >
+                Back to Upload
+              </Button>
+              <Button onClick={handleComplete}>Start classify workflow</Button>
+            </div>
+          </CardContent>
+        </Card>
+      </ReportWizardLayout>
     </div>
   );
 }
