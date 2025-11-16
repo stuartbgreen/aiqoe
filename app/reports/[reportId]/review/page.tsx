@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { use, useCallback, useEffect, useRef, useState } from "react";
+import { use, useCallback, useEffect, useState } from "react";
 
 const STEPS = [
   { number: 1, title: "Report Name", description: "Name your report" },
@@ -29,12 +29,6 @@ interface UploadedFile {
   documentType?: string;
 }
 
-interface StoredRunState {
-  runId: string;
-  chunkIndex: number;
-  output: string;
-}
-
 export default function ReviewClassificationPage({
   params,
 }: {
@@ -49,26 +43,24 @@ export default function ReviewClassificationPage({
   const [classificationOutput, setClassificationOutput] = useState("");
   const [isClassifying, setIsClassifying] = useState(false);
   const router = useRouter();
-  const chunkIndexRef = useRef(0);
   const storageKey = `report-${reportId}-classification-run`;
 
-  const updateStoredRunState = useCallback(
-    (state: StoredRunState | null) => {
+  const updateStoredRunId = useCallback(
+    (runId: string | null) => {
       if (typeof window === "undefined") return;
-      if (!state) {
+      if (!runId) {
         window.localStorage.removeItem(storageKey);
         return;
       }
 
-      window.localStorage.setItem(storageKey, JSON.stringify(state));
+      window.localStorage.setItem(storageKey, runId);
     },
     [storageKey]
   );
 
   const streamFromRun = useCallback(
-    async (runId: string, startIndex = 0) => {
-      const query = startIndex > 0 ? `?startIndex=${startIndex}` : "";
-      const response = await fetch(`/api/resume-stream/${runId}${query}`);
+    async (runId: string) => {
+      const response = await fetch(`/api/resume-stream/${runId}`);
       if (!response.ok) {
         throw new Error("Unable to resume classification stream");
       }
@@ -86,38 +78,19 @@ export default function ReviewClassificationPage({
         if (done) break;
         if (value) {
           const decodedChunk = decoder.decode(value, { stream: true });
-          const nextIndex = chunkIndexRef.current + 1;
-          chunkIndexRef.current = nextIndex;
 
-          setClassificationOutput((prev) => {
-            const nextOutput = prev + decodedChunk;
-            updateStoredRunState({
-              runId,
-              chunkIndex: nextIndex,
-              output: nextOutput,
-            });
-            return nextOutput;
-          });
+          setClassificationOutput((prev) => prev + decodedChunk);
         }
       }
 
       const flushed = decoder.decode();
       if (flushed) {
-        setClassificationOutput((prev) => {
-          const nextOutput = prev + flushed;
-          updateStoredRunState({
-            runId,
-            chunkIndex: chunkIndexRef.current,
-            output: nextOutput,
-          });
-          return nextOutput;
-        });
+        setClassificationOutput((prev) => prev + flushed);
       }
 
-      // updateStoredRunState(null);
-      chunkIndexRef.current = 0;
+      updateStoredRunId(null);
     },
-    [updateStoredRunState]
+    [updateStoredRunId]
   );
 
   useEffect(() => {
@@ -165,35 +138,26 @@ export default function ReviewClassificationPage({
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const storedValue = window.localStorage.getItem(storageKey);
-    if (!storedValue) return;
+    const storedRunId = window.localStorage.getItem(storageKey);
+    if (!storedRunId) return;
 
-    try {
-      const parsed = JSON.parse(storedValue) as StoredRunState;
-      if (!parsed?.runId) return;
+    setClassificationOutput("");
+    setIsClassifying(true);
 
-      chunkIndexRef.current = parsed.chunkIndex ?? 0;
-      setClassificationOutput(parsed.output ?? "");
-      setIsClassifying(true);
-
-      streamFromRun(parsed.runId, parsed.chunkIndex ?? 0)
-        .catch((err) => {
-          console.error("Failed to resume classification:", err);
-          setError("Failed to resume classification stream.");
-        })
-        .finally(() => {
-          setIsClassifying(false);
-        });
-    } catch {
-      window.localStorage.removeItem(storageKey);
-    }
+    streamFromRun(storedRunId)
+      .catch((err) => {
+        console.error("Failed to resume classification:", err);
+        setError("Failed to resume classification stream.");
+      })
+      .finally(() => {
+        setIsClassifying(false);
+      });
   }, [storageKey, streamFromRun]);
 
   const handleComplete = async () => {
     setError("");
     setClassificationOutput("");
     setIsClassifying(true);
-    chunkIndexRef.current = 0;
     let runId: string | null = null;
 
     try {
@@ -210,19 +174,15 @@ export default function ReviewClassificationPage({
         throw new Error("Missing workflow run id");
       }
 
-      updateStoredRunState({
-        runId: extractedRunId,
-        chunkIndex: 0,
-        output: "",
-      });
+      updateStoredRunId(extractedRunId);
 
-      await streamFromRun(extractedRunId, 0);
+      await streamFromRun(extractedRunId);
     } catch (err) {
       console.error("Failed to start classification:", err);
       setError("Failed to start classification");
       setClassificationOutput("Failed to read classification output.");
       if (!runId) {
-        updateStoredRunState(null);
+        updateStoredRunId(null);
       }
     } finally {
       setIsClassifying(false);
