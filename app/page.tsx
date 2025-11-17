@@ -11,6 +11,7 @@ export default function Home() {
       {/* <AboutSection />
       <DemoSection /> */}
       <LandingTrustBadges />
+      {/* <LandingCTA /> */}
       <LandingFooter />
     </main>
   );
