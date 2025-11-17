@@ -20,7 +20,7 @@ export function LandingHero() {
 
           <div className="flex flex-col sm:flex-row gap-4 pt-6">
             <Button asChild size="lg" className="h-12">
-              <Link href="#demo">Schedule demo</Link>
+              <Link href="https://calendly.com/arvusai/30min" target="_blank" rel="noopener noreferrer">Schedule demo</Link>
             </Button>
             {/* <Button asChild size="lg" variant="outline" className="h-12">
               <Link href="#learn-more">Learn More</Link>
