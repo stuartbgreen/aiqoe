@@ -37,21 +37,6 @@ export function LandingFooter() {
           </div>
 
           <div>
-            <h3 className="font-semibold mb-4 text-sm uppercase tracking-wider">Legal</h3>
-            <ul className="space-y-3 text-sm">
-              <li>
-                <Link href="#" className="text-muted-foreground hover:text-foreground transition-colors">
-                  Privacy Policy
-                </Link>
-              </li>
-              <li>
-                <Link href="#" className="text-muted-foreground hover:text-foreground transition-colors">
-                  Terms of Service
-                </Link>
-              </li>
-            </ul>
-          </div>
-          <div>
             <h3 className="font-semibold mb-4 text-sm uppercase tracking-wider">About</h3>
             <ul className="space-y-3 text-sm">
               <li>
@@ -62,6 +47,22 @@ export function LandingFooter() {
               <li>
                 <Link href="mailto:hello@arvus.ai" className="text-muted-foreground hover:text-foreground transition-colors">
                   Contact Us
+                </Link>
+              </li>
+            </ul>
+          </div>
+
+          <div>
+            <h3 className="font-semibold mb-4 text-sm uppercase tracking-wider">Legal</h3>
+            <ul className="space-y-3 text-sm">
+              <li>
+                <Link href="/privacy" className="text-muted-foreground hover:text-foreground transition-colors">
+                  Privacy Policy
+                </Link>
+              </li>
+              <li>
+                <Link href="/terms" className="text-muted-foreground hover:text-foreground transition-colors">
+                  Terms of Service
                 </Link>
               </li>
             </ul>
