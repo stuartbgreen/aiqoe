@@ -5,7 +5,7 @@ import Link from "next/link";
 
 export function LandingHero() {
   return (
-    <section className="w-full py-32 md:py-40 lg:py-52 relative">
+    <section className="w-full py-16 md:py-40 lg:py-52 relative">
       <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-background/50 pointer-events-none" />
       <div className="mx-auto max-w-7xl px-6 relative">
         <div className="flex flex-col items-center text-center space-y-10">

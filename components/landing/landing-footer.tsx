@@ -14,6 +14,9 @@ export function LandingFooter() {
             <p className="text-sm text-muted-foreground">
               AI-powered due diligence for M&A teams
             </p>
+            <p className="text-sm text-muted-foreground">
+              Chicago, IL
+            </p>
           </div>
 
 
@@ -52,8 +55,13 @@ export function LandingFooter() {
             <h3 className="font-semibold mb-4 text-sm uppercase tracking-wider">About</h3>
             <ul className="space-y-3 text-sm">
               <li>
-                <Link href="#" className="text-muted-foreground hover:text-foreground transition-colors">
+                <Link href="https://calendly.com/arvusai/30min" target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-foreground transition-colors">
                   Schedule Demo
+                </Link>
+              </li>
+              <li>
+                <Link href="mailto:hello@arvus.ai" className="text-muted-foreground hover:text-foreground transition-colors">
+                  Contact Us
                 </Link>
               </li>
             </ul>
