@@ -1,16 +1,14 @@
 import type { Metadata } from "next";
 import { ThemeProvider } from "next-themes";
-import { Geist, EB_Garamond } from "next/font/google";
+import { EB_Garamond, Geist } from "next/font/google";
 import "./globals.css";
 
-const defaultUrl = process.env.VERCEL_URL
-  ? `https://${process.env.VERCEL_URL}`
-  : "http://localhost:3000";
-
 export const metadata: Metadata = {
-  metadataBase: new URL(defaultUrl),
-  title: "Arvus - AI for Financial Due Diligence",
-  description: "Empowering private equity firms with intelligent automation for comprehensive due diligence processes.",
+  title: "Arvus - AI-Powered Due Diligence for M&A Teams",
+  description: "Arvus helps private equity and transaction advisory firms automate repetitive data cleanup and reporting tasks. Streamline your M&A due diligence process with AI.",
+  alternates: {
+    canonical: "https://arvus.ai",
+  },
 };
 
 const geistSans = Geist({
